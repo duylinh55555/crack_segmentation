@@ -7,7 +7,7 @@ import numpy as np
 
 import torch
 import tqdm
-from unet.unet_transfer import UNet16, UNetResNet
+from unet.unet_transfer import UNet16, UNetResNet, U_Net, R2U_Net, AttU_Net, R2AttU_Net
 
 
 class AverageMeter(object):
@@ -89,6 +89,66 @@ def load_unet_resnet_101(model_path):
 
 def load_unet_resnet_34(model_path):
     model = UNetResNet(pretrained=True, encoder_depth=34, num_classes=1)
+    checkpoint = torch.load(model_path)
+    if 'model' in checkpoint:
+        model.load_state_dict(checkpoint['model'])
+    elif 'state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['check_point'])
+    else:
+        raise Exception('undefind model format')
+
+    model.cuda()
+    model.eval()
+
+    return model
+
+def load_unet_U_Net(model_path):
+    model = U_Net(img_ch=3, output_ch=1)
+    checkpoint = torch.load(model_path)
+    if 'model' in checkpoint:
+        model.load_state_dict(checkpoint['model'])
+    elif 'state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['check_point'])
+    else:
+        raise Exception('undefind model format')
+
+    model.cuda()
+    model.eval()
+
+    return model
+
+def load_unet_R2U_Net(model_path):
+    model = R2U_Net(img_ch=3, output_ch=1,t=2)
+    checkpoint = torch.load(model_path)
+    if 'model' in checkpoint:
+        model.load_state_dict(checkpoint['model'])
+    elif 'state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['check_point'])
+    else:
+        raise Exception('undefind model format')
+
+    model.cuda()
+    model.eval()
+
+    return model
+
+def load_unet_AttU_Net(model_path):
+    model = AttU_Net(img_ch=3, output_ch=1)
+    checkpoint = torch.load(model_path)
+    if 'model' in checkpoint:
+        model.load_state_dict(checkpoint['model'])
+    elif 'state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['check_point'])
+    else:
+        raise Exception('undefind model format')
+
+    model.cuda()
+    model.eval()
+
+    return model
+
+def load_unet_R2AttU_Net(model_path):
+    model = R2AttU_Net(img_ch=3, output_ch=1,t=2)
     checkpoint = torch.load(model_path)
     if 'model' in checkpoint:
         model.load_state_dict(checkpoint['model'])

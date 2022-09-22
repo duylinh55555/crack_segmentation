@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from unet.unet_transfer import UNet16, UNetResNet, U_Net, R2U_Net, AttU_Net, R2AttU_Net
+from unet.unet_transfer import UNet16, UNetResNet
 from pathlib import Path
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -13,10 +13,6 @@ import argparse
 import tqdm
 import numpy as np
 import scipy.ndimage as ndimage
-from evaluation import *
-import csv
-import time
-import datetime
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -35,11 +31,7 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def create_model(device, args):
-    type ='vgg16'
-
-    type = args.model_type
-
+def create_model(device, type ='vgg16'):
     if type == 'vgg16':
         print('create vgg16 model')
         model = UNet16(pretrained=True)
@@ -53,14 +45,6 @@ def create_model(device, args):
         num_classes = 1
         print('create resnet34 model')
         model = UNetResNet(encoder_depth=encoder_depth, num_classes=num_classes, pretrained=True)
-    elif type == 'U_Net':
-        model = U_Net(img_ch=args.img_ch, output_ch=args.output_ch)
-    elif type == 'R2U_Net':
-        model = R2U_Net(img_ch=args.img_ch, output_ch=args.output_ch,t=args.t)
-    elif type == 'AttU_Net':
-        model = AttU_Net(img_ch=args.img_ch, output_ch=args.output_ch)
-    elif type == 'R2AttU_Net':
-        model = R2AttU_Net(img_ch=args.img_ch, output_ch=args.output_ch,t=args.t)
     else:
         assert False
     model.eval()
@@ -76,10 +60,19 @@ def find_latest_model_path(dir):
     model_paths = []
     epochs = []
     for path in Path(dir).glob('*.pt'):
-        if 'lastest_model' in path.stem:
-            return path
-        else:
-            return None
+        if 'epoch' not in path.stem:
+            continue
+        model_paths.append(path)
+        parts = path.stem.split('_')
+        epoch = int(parts[-1])
+        epochs.append(epoch)
+
+    if len(epochs) > 0:
+        epochs = np.array(epochs)
+        max_idx = np.argmax(epochs)
+        return model_paths[max_idx]
+    else:
+        return None
 
 def train(train_loader, model, criterion, optimizer, validation, args):
 
@@ -104,29 +97,18 @@ def train(train_loader, model, criterion, optimizer, validation, args):
         print(f'Started training model from epoch {epoch}')
     else:
         print('Started training model from epoch 0')
-        best_epoch = 0
         epoch = 0
-        best_unet_score = 0.
         min_val_los = 9999
 
     valid_losses = []
     for epoch in range(epoch, args.n_epoch + 1):
-        iter_start_time = time.time()
+
         adjust_learning_rate(optimizer, epoch, args.lr)
 
         tq = tqdm.tqdm(total=(len(train_loader) * args.batch_size))
         tq.set_description(f'Epoch {epoch}')
 
         losses = AverageMeter()
-
-        acc = 0.	# Accuracy
-        SE = 0.		# Sensitivity (Recall)
-        SP = 0.		# Specificity
-        PC = 0. 	# Precision
-        F1 = 0.		# F1 Score
-        JS = 0.		# Jaccard Similarity
-        DC = 0.		# Dice Coefficient
-        length = 0
 
         model.train()
         for i, (input, target) in enumerate(train_loader):
@@ -148,39 +130,14 @@ def train(train_loader, model, criterion, optimizer, validation, args):
             loss.backward()
             optimizer.step()
 
-            acc += get_accuracy(masks_pred,target_var)
-            SE += get_sensitivity(masks_pred,target_var)
-            SP += get_specificity(masks_pred,target_var)
-            PC += get_precision(masks_pred,target_var)
-            F1 += get_F1(masks_pred,target_var)
-            JS += get_JS(masks_pred,target_var)
-            DC += get_DC(masks_pred,target_var)
-            length += input_var.size(0)
-
-        acc = acc/length
-        SE = SE/length
-        SP = SP/length
-        PC = PC/length
-        F1 = F1/length
-        JS = JS/length
-        DC = DC/length
-        unet_score = JS + DC
-
-        # Print the log info
-        print('\nAcc: %.4f, SE: %.4f, SP: %.4f, PC: %.4f, F1: %.4f, JS: %.4f, DC: %.4f' % (acc,SE,SP,PC,F1,JS,DC))
-        f = open(os.path.join(args.result_dir,'train_log.csv'), 'a', encoding='utf-8', newline='')
-        wr = csv.writer(f)
-        wr.writerow([epoch,acc,losses.avg,SE,SP,PC,F1,JS,DC,unet_score])
-        f.close()
-
-        # Validation
-        valid_metrics = validation(model, valid_loader, criterion, epoch, iter_start_time)
+        valid_metrics = validation(model, valid_loader, criterion)
         valid_loss = valid_metrics['valid_loss']
         valid_losses.append(valid_loss)
+        print(f'\tvalid_loss = {valid_loss:.5f}')
         tq.close()
 
         #save the model of the current epoch
-        epoch_model_path = os.path.join(*[args.model_dir, 'lastest_model.pt'])
+        epoch_model_path = os.path.join(*[args.model_dir, f'model_epoch_{epoch}.pt'])
         torch.save({
             'model': model.state_dict(),
             'epoch': epoch,
@@ -198,19 +155,9 @@ def train(train_loader, model, criterion, optimizer, validation, args):
                 'train_loss': losses.avg
             }, best_model_path)
 
-def validate(model, val_loader, criterion, current_epoch, iter_start_time):
+def validate(model, val_loader, criterion):
     losses = AverageMeter()
     model.eval()
-
-    acc = 0.	# Accuracy
-    SE = 0.		# Sensitivity (Recall)
-    SP = 0.		# Specificity
-    PC = 0. 	# Precision
-    F1 = 0.		# F1 Score
-    JS = 0.		# Jaccard Similarity
-    DC = 0.		# Dice Coefficient
-    length=0
-
     with torch.no_grad():
 
         for i, (input, target) in enumerate(val_loader):
@@ -221,36 +168,6 @@ def validate(model, val_loader, criterion, current_epoch, iter_start_time):
             loss = criterion(output, target_var)
 
             losses.update(loss.item(), input_var.size(0))
-
-            acc += get_accuracy(input_var,target_var)
-            SE += get_sensitivity(input_var,target_var)
-            SP += get_specificity(input_var,target_var)
-            PC += get_precision(input_var,target_var)
-            F1 += get_F1(input_var,target_var)
-            JS += get_JS(input_var,target_var)
-            DC += get_DC(input_var,target_var)
-            length += input_var.size(0)
-
-        acc = acc/length
-        SE = SE/length
-        SP = SP/length
-        PC = PC/length
-        F1 = F1/length
-        JS = JS/length
-        DC = DC/length
-        unet_score = JS + DC
-
-        print(f'\tvalid_loss = {losses.avg:.5f}')
-        print('[Validation] Acc: %.4f, SE: %.4f, SP: %.4f, PC: %.4f, F1: %.4f, JS: %.4f, DC: %.4f, unet_score: %.4f'%(acc,SE,SP,PC,F1,JS,DC,unet_score))
-
-        current_epoch_time = time.time() - iter_start_time
-        print("Time: " + str(current_epoch_time))
-
-        dt_string = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        f = open(os.path.join(args.result_dir,'val_log.csv'), 'a', encoding='utf-8', newline='')
-        wr = csv.writer(f)
-        wr.writerow([current_epoch,acc,losses.avg,SE,SP,PC,F1,JS,DC,unet_score,current_epoch_time,dt_string])
-        f.close()
 
     return {'valid_loss': losses.avg}
 
@@ -282,43 +199,25 @@ if __name__ == '__main__':
     parser.add_argument('-weight_decay', default=1e-4, type=float, metavar='W', help='weight decay (default: 1e-4)')
     parser.add_argument('-batch_size',  default=4, type=int,  help='weight decay (default: 1e-4)')
     parser.add_argument('-num_workers', default=4, type=int, help='output dataset directory')
-    parser.add_argument('-img_ch', type=int, default=3)
-    parser.add_argument('-output_ch', type=int, default=1)
-    
-    # model hyper-parameters
-    parser.add_argument('--image_size', type=int, default=224)
-    parser.add_argument('--t', type=int, default=3, help='t for Recurrent step of R2U_Net or R2AttU_Net')
-    
 
     parser.add_argument('-data_dir',type=str, help='input dataset directory')
     parser.add_argument('-model_dir', type=str, help='output dataset directory')
-    parser.add_argument('-model_type', type=str, required=False, default='resnet101', choices=['vgg16', 'resnet101', 'resnet34', 'U_Net', 'R2U_Net', 'AttU_Net', 'R2AttU_Net'])
-    parser.add_argument('-result_dir', type=str, help='results log directory')
+    parser.add_argument('-model_type', type=str, required=False, default='resnet101', choices=['vgg16', 'resnet101', 'resnet34'])
 
     args = parser.parse_args()
     os.makedirs(args.model_dir, exist_ok=True)
 
-    DIR_TRAIN = os.path.join(args.data_dir, 'train')
-    DIR_TRAIN_GT = os.path.join(args.data_dir, 'train_GT_jpg')
-    DIR_VAL = os.path.join(args.data_dir, 'valid')
-    DIR_VAL_GT = os.path.join(args.data_dir, 'valid_GT_jpg')
-    DIR_TEST = os.path.join(args.data_dir, 'test')
-    DIR_TEST_GT = os.path.join(args.data_dir, 'test_GT_jpg')
+    DIR_IMG  = os.path.join(args.data_dir, 'images')
+    DIR_MASK = os.path.join(args.data_dir, 'masks')
 
-    train_img_names  = [path.name for path in Path(DIR_TRAIN).glob('*.jpg')]
-    train_mask_names = [path.name for path in Path(DIR_TRAIN_GT).glob('*.jpg')]
-    val_img_names  = [path.name for path in Path(DIR_VAL).glob('*.jpg')]
-    val_mask_names = [path.name for path in Path(DIR_VAL_GT).glob('*.jpg')]
-    test_img_names  = [path.name for path in Path(DIR_TEST).glob('*.jpg')]
-    test_mask_names = [path.name for path in Path(DIR_TEST_GT).glob('*.jpg')]
+    img_names  = [path.name for path in Path(DIR_IMG).glob('*.jpg')]
+    mask_names = [path.name for path in Path(DIR_MASK).glob('*.jpg')]
 
-    print(f'Train images = {len(train_img_names)}')
-    print(f'Validate images = {len(val_img_names)}')
-    print(f'Test images = {len(test_img_names)}')
+    print(f'total images = {len(img_names)}')
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = create_model(device, args)
+    model = create_model(device, args.model_type)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -339,15 +238,10 @@ if __name__ == '__main__':
 
     mask_tfms = transforms.Compose([transforms.ToTensor()])
 
-    # dataset = ImgDataSet(img_dir=DIR_IMG, img_fnames=img_names, img_transform=train_tfms, mask_dir=DIR_MASK, mask_fnames=mask_names, mask_transform=mask_tfms)
-    # train_size = int(0.7*len(dataset))
-    # valid_size = len(dataset) - train_size
-    # train_dataset, valid_dataset = random_split(dataset, [train_size, valid_size])
-
-    train_dataset   = ImgDataSet(img_dir=DIR_TRAIN, img_fnames=train_img_names, img_transform=train_tfms, mask_dir=DIR_TRAIN_GT, mask_fnames=train_mask_names,  mask_transform=mask_tfms)
-    valid_dataset   = ImgDataSet(img_dir=DIR_VAL,   img_fnames=val_img_names,   img_transform=train_tfms, mask_dir=DIR_VAL_GT,   mask_fnames=val_mask_names,    mask_transform=mask_tfms)
-    test_dataset    = ImgDataSet(img_dir=DIR_TEST,  img_fnames=test_img_names,  img_transform=train_tfms, mask_dir=DIR_TEST_GT,  mask_fnames=test_mask_names,   mask_transform=mask_tfms)
-
+    dataset = ImgDataSet(img_dir=DIR_IMG, img_fnames=img_names, img_transform=train_tfms, mask_dir=DIR_MASK, mask_fnames=mask_names, mask_transform=mask_tfms)
+    train_size = int(0.85*len(dataset))
+    valid_size = len(dataset) - train_size
+    train_dataset, valid_dataset = random_split(dataset, [train_size, valid_size])
 
     train_loader = DataLoader(train_dataset, args.batch_size, shuffle=False, pin_memory=torch.cuda.is_available(), num_workers=args.num_workers)
     valid_loader = DataLoader(valid_dataset, args.batch_size, shuffle=False, pin_memory=torch.cuda.is_available(), num_workers=args.num_workers)

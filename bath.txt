@@ -1,0 +1,12 @@
+gdown https://drive.google.com/uc?id=1xrOqv0-3uMHjZyEUrerOYiYXW_E8SUMP
+mkdir ./models
+gdown https://drive.google.com/uc?id=1wA2eAsyFZArG3Zc9OaKvnBuxSAPyDl08 -O "./models/model_unet_vgg_16_best.pt"
+
+Inference:
+python inference_unet.py  -img_dir "./test_imgs" -model_path "./models/model_unet_vgg_16_best.pt" -model_type "vgg16" -out_pred_dir "./test_result"
+
+Training:
+python train_unet.py -data_dir PATH_TO_THE_DATASET_FOLDER -model_dir PATH_TO_MODEL_DIRECTORY -model_type vgg16
+
+Evaluate:
+python evaluate_unet.py -ground_truth_dir "./test_imgs" -pred_dir "./test_result"

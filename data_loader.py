@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, Dataset
 import random
 from PIL import Image
 import matplotlib.pyplot as plt
+import pdb
 
 class ImgDataSet(Dataset):
     def __init__(self, img_dir, img_fnames, img_transform, mask_dir, mask_fnames, mask_transform):
@@ -34,6 +35,8 @@ class ImgDataSet(Dataset):
             mask = self.mask_transform(mask)
             #print('mask shape', mask.shape)
             #print('khanh2', np.min(test[:]), np.max(test[:]))
+
+        # pdb.set_trace()
 
         return img, mask #torch.from_numpy(np.array(mask, dtype=np.int64))
 

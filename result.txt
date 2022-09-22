@@ -1,0 +1,46 @@
+python train_unet.py -data_dir "./img_data" -model_dir "./models" -model_type vgg16
+
+git config --global user.email "linh9920duy@gmail.com"
+git config --global user.name "duylinh55555"
+
+Started training model from epoch 0
+
+Epoch 0: 100%|█████████████████████████████████| 9604/9604 [43:09<00:00,  3.81it/s, loss=0.12753]valid_loss = 0.08769
+Epoch 1: 100%|█████████████████████████████████| 9604/9604 [43:08<00:00,  3.82it/s, loss=0.07862]valid_loss = 0.06861
+Epoch 2: 100%|█████████████████████████████████| 9604/9604 [43:07<00:00,  3.81it/s, loss=0.06732]valid_loss = 0.06452
+
+Epoch 4: 100%|█████████████████████████████████| 9604/9604 [43:07<00:00,  3.81it/s, loss=0.06108]  valid_loss = 0.06128
+                                                                                                      | 6/84 [00:00<00:02, 27.91it/s]missing prediction for file crack_in_large_context_05.jpeg
+missing prediction for file crack_in_large_context_07.jpeg
+ 30%|███████████████████████████████████                                                                                   | 25/84 [00:00<00:01, 42.24it/s]missing prediction for file crack_in_large_context_02.jpeg
+missing prediction for file crack_in_large_context_09.jpeg
+ 60%|██████████████████████████████████████████████████████████████████████▏                                               | 50/84 [00:00<00:00, 66.81it/s]missing prediction for file pure_crack_17.jpg
+ 69%|█████████████████████████████████████████████████████████████████████████████████▍                                    | 58/84 [00:01<00:00, 62.21it/s]missing prediction for file crack_in_large_context_08.jpeg
+ 88%|███████████████████████████████████████████████████████████████████████████████████████████████████████▉              | 74/84 [00:01<00:00, 52.40it/s]missing prediction for file crack_in_large_context_03.jpeg
+missing prediction for file crack_in_large_context_01.JPG
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 84/84 [00:01<00:00, 56.82it/s]
+Dice =  0.15504207225658648 0.10678696215064158
+Jaccard =  0.08817128193988559 0.07188796132821587
+
+DEFAULT_MODEL:
+/usr/local/lib/python3.7/dist-packages/torchvision/models/_utils.py:209: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and will be removed in 0.15, please use 'weights' instead.
+  f"The parameter '{pretrained_param}' is deprecated since 0.13 and will be removed in 0.15, "
+/usr/local/lib/python3.7/dist-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and will be removed in 0.15. The current behavior is equivalent to passing `weights=VGG16_Weights.IMAGENET1K_V1`. You can also use `weights=VGG16_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+  0%|                                                                                                                               | 0/84 [00:00<?, ?it/s]/usr/local/lib/python3.7/dist-packages/torch/nn/functional.py:1960: UserWarning: nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.
+  warnings.warn("nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.")
+ 67%|██████████████████████████████████████████████████████████████████████████████▋                                       | 56/84 [00:09<00:04,  6.93it/s]incorrect image shape: pure_crack_17.jpg(975, 1300)
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 84/84 [00:13<00:00,  6.46it/s]
+/content/crack_segmentation_clone# python evaluate_unet.py -ground_truth_dir "./test_imgs" -pred_dir "./test_result"
+  0%|                                                                                                                               | 0/84 [00:00<?, ?it/s]missing prediction for file crack_in_large_context_06.jpeg
+  7%|████████▌                                                                                                              | 6/84 [00:00<00:02, 31.28it/s]missing prediction for file crack_in_large_context_05.jpeg
+missing prediction for file crack_in_large_context_07.jpeg
+ 30%|███████████████████████████████████                                                                                   | 25/84 [00:00<00:01, 44.11it/s]missing prediction for file crack_in_large_context_02.jpeg
+missing prediction for file crack_in_large_context_09.jpeg
+ 61%|███████████████████████████████████████████████████████████████████████▋                                              | 51/84 [00:00<00:00, 65.46it/s]missing prediction for file pure_crack_17.jpg
+ 70%|██████████████████████████████████████████████████████████████████████████████████▉                                   | 59/84 [00:01<00:00, 63.12it/s]missing prediction for file crack_in_large_context_08.jpeg
+ 80%|██████████████████████████████████████████████████████████████████████████████████████████████                        | 67/84 [00:01<00:00, 52.71it/s]missing prediction for file crack_in_large_context_03.jpeg
+ 90%|██████████████████████████████████████████████████████████████████████████████████████████████████████████▊           | 76/84 [00:01<00:00, 60.34it/s]missing prediction for file crack_in_large_context_01.JPG
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 84/84 [00:01<00:00, 59.18it/s]
+Dice =  0.09550105945419589 0.07679953562096337
+Jaccard =  0.052010059583909835 0.046370453246500146

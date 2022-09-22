@@ -13,7 +13,7 @@ import argparse
 from os.path import join
 from PIL import Image
 import gc
-from utils import load_unet_vgg16, load_unet_resnet_101, load_unet_resnet_34
+from utils import load_unet_vgg16, load_unet_resnet_101, load_unet_resnet_34, load_unet_U_Net, load_unet_R2U_Net, load_unet_AttU_Net, load_unet_R2AttU_Net
 from tqdm import tqdm
 
 def evaluate_img(model, img):
@@ -25,7 +25,7 @@ def evaluate_img(model, img):
 
     mask = model(X)
 
-    mask = F.sigmoid(mask[0, 0]).data.cpu().numpy()
+    mask = torch.sigmoid(mask[0, 0]).data.cpu().numpy()
     mask = cv.resize(mask, (img_width, img_height), cv.INTER_AREA)
     return mask
 
@@ -60,7 +60,7 @@ def evaluate_img_patch(model, img):
         patch_n = train_tfms(Image.fromarray(patch))
         X = Variable(patch_n.unsqueeze(0)).cuda()  # [N, 1, H, W]
         masks_pred = model(X)
-        mask = F.sigmoid(masks_pred[0, 0]).data.cpu().numpy()
+        mask = torch.sigmoid(masks_pred[0, 0]).data.cpu().numpy()
         preds.append(mask)
 
     probability_map = np.zeros((img_height, img_width), dtype=float)
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-img_dir',type=str, help='input dataset directory')
     parser.add_argument('-model_path', type=str, help='trained model path')
-    parser.add_argument('-model_type', type=str, choices=['vgg16', 'resnet101', 'resnet34'])
+    parser.add_argument('-model_type', type=str, choices=['vgg16', 'resnet101', 'resnet34', 'U_Net', 'R2U_Net', 'AttU_Net', 'R2AttU_Net'])
     parser.add_argument('-out_viz_dir', type=str, default='', required=False, help='visualization output dir')
     parser.add_argument('-out_pred_dir', type=str, default='', required=False,  help='prediction output dir')
     parser.add_argument('-threshold', type=float, default=0.2 , help='threshold to cut off crack response')
@@ -104,6 +104,14 @@ if __name__ == '__main__':
     elif args.model_type  == 'resnet34':
         model = load_unet_resnet_34(args.model_path)
         print(model)
+    elif args.model_type  == 'U_Net':
+        model = load_unet_U_Net(args.model_path)
+    elif args.model_type  == 'R2U_Net':
+        model = load_unet_R2U_Net(args.model_path)
+    elif args.model_type  == 'AttU_Net':
+        model = load_unet_AttU_Net(args.model_path)
+    elif args.model_type  == 'R2AttU_Net':
+        model = load_unet_R2AttU_Net(args.model_path)
     else:
         print('undefind model name pattern')
         exit()
@@ -130,7 +138,7 @@ if __name__ == '__main__':
         prob_map_full = evaluate_img(model, img_0)
 
         if args.out_pred_dir != '':
-            cv.imwrite(filename=join(args.out_pred_dir, f'{path.stem}.jpg'), img=(prob_map_full * 255).astype(np.uint8))
+            cv.imwrite(filename=join(args.out_pred_dir, f'{path.stem}.png'), img=(prob_map_full * 255).astype(np.uint8))
 
         if args.out_viz_dir != '':
             # plt.subplot(121)
